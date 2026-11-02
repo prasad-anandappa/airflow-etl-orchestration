@@ -25,6 +25,11 @@ jobs:
           AIRFLOW__CORE__DAGS_FOLDER: ${{ github.workspace }}/dags
           AIRFLOW__CORE__LOAD_EXAMPLES: "false"
         run: |
-          out=$(airflow dags list-import-errors 2>&1)
+          # list-import-errors reads the import_error table from the metadata
+          # DB. A fresh runner has no DB yet, so the CLI died on the missing
+          # table (silently, under bash -e) before it could report anything.
+          # Initialise the DB first, then run the same assertion as before.
+          airflow db migrate
+          out=$(airflow dags list-import-errors 2>&1) || { echo "$out"; echo "airflow CLI failed"; exit 1; }
           echo "$out"
           echo "$out" | grep -q "No data found" || (echo "import errors present" && exit 1)
