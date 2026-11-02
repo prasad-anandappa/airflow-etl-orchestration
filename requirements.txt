@@ -1,0 +1,5 @@
+# Runtime parity for CI/local testing. The compose stack uses the official
+# apache/airflow image; this pins the same Airflow for the DagBag tests.
+apache-airflow==2.10.5
+pyyaml>=6
+pytest>=8

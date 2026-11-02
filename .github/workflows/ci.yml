@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  dagbag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Airflow (constrained, matches requirements.txt)
+        run: |
+          pip install "apache-airflow==2.10.5" \
+            --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-2.10.5/constraints-3.12.txt"
+          pip install pyyaml pytest
+      - name: DagBag integrity + logic tests
+        run: python -m pytest tests/ -q
+      - name: CLI import-error check
+        env:
+          AIRFLOW__CORE__DAGS_FOLDER: ${{ github.workspace }}/dags
+          AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+        run: |
+          out=$(airflow dags list-import-errors 2>&1)
+          echo "$out"
+          echo "$out" | grep -q "No data found" || (echo "import errors present" && exit 1)

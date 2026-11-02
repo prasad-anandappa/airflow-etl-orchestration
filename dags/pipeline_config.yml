@@ -1,0 +1,46 @@
+# Pipeline definitions consumed by dag_factory.py.
+#
+# Adding a pipeline = adding an entry here, not writing a new DAG file.
+# The factory validates every entry at parse time (tests/test_dag_integrity
+# .py fails the build on a malformed entry), and each generated DAG keeps
+# the same task graph: sense -> stage -> quality gate -> load -> verify.
+#
+# Fields:
+#   name          unique pipeline slug; dag_id becomes "etl_<name>"
+#   file_pattern  extract filename template; {{ ds }} is the logical date
+#   table         warehouse target table
+#   key_columns   natural key for idempotent upserts
+#   schedule      cron string
+#   checks        data-quality gate definitions (see common/quality.py)
+pipelines:
+  - name: payments
+    file_pattern: "payments_{{ ds }}.csv"
+    table: payments
+    key_columns: [payment_id]
+    schedule: "15 2 * * *"
+    checks:
+      - {name: row_count, type: row_count, min_rows: 1}
+      - {name: unique_payment, type: unique, columns: [payment_id]}
+      - {name: amount_present, type: not_null, column: amount}
+      - {name: status_domain, type: values_in, column: status,
+         allowed: [authorised, settled, failed, voided]}
+
+  - name: refunds
+    file_pattern: "refunds_{{ ds }}.csv"
+    table: refunds
+    key_columns: [refund_id]
+    schedule: "25 2 * * *"
+    checks:
+      - {name: row_count, type: row_count, min_rows: 0}
+      - {name: unique_refund, type: unique, columns: [refund_id]}
+      - {name: amount_present, type: not_null, column: amount}
+
+  - name: customers
+    file_pattern: "customers_{{ ds }}.csv"
+    table: customers
+    key_columns: [customer_id]
+    schedule: "35 2 * * *"
+    checks:
+      - {name: row_count, type: row_count, min_rows: 1}
+      - {name: unique_customer, type: unique, columns: [customer_id]}
+      - {name: email_present, type: not_null, column: email}

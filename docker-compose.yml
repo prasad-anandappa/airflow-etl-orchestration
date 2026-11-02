@@ -1,0 +1,74 @@
+# Airflow 2.10 + Postgres, LocalExecutor — the smallest stack that runs
+# every pattern in this repo (scheduler, workers, and a triggerer for the
+# deferrable sensor). Based on the official Airflow compose, trimmed.
+#
+#   docker compose up airflow-init   # one-time: DB migrations + admin user
+#   docker compose up -d
+#   # UI on http://localhost:8080  (admin / admin)
+#   mkdir -p data/landing && cp data/sample_payments.csv \
+#       "data/landing/payments_$(date -F).csv"   # then unpause a DAG
+x-airflow-common: &airflow-common
+  image: apache/airflow:2.10.5
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    ETL_LANDING_DIR: /opt/airflow/data/landing
+    ETL_QUARANTINE_DIR: /opt/airflow/data/quarantine
+    ETL_WAREHOUSE_PATH: /opt/airflow/data/warehouse.db
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./data:/opt/airflow/data
+    - ./logs:/opt/airflow/logs
+  depends_on: &airflow-common-depends-on
+    postgres:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 5
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate &&
+        airflow users create --username admin --password admin \
+          --firstname Admin --lastname User --role Admin \
+          --email admin@example.com || true
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    restart: unless-stopped
+
+  airflow-triggerer:
+    <<: *airflow-common
+    command: triggerer
+    restart: unless-stopped
+
+volumes:
+  postgres-db-volume:

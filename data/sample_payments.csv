@@ -1,0 +1,7 @@
+payment_id,order_id,amount,currency,status,settled_at
+pay_9001,ord_501,125.50,usd,settled,2026-01-15T09:14:00
+pay_9002,ord_502,89.99,USD,settled,2026-01-15T10:02:00
+pay_9003,ord_503,240.00,USD,authorised,
+pay_9004,ord_504,15.25,eur,settled,2026-01-15T11:45:00
+pay_9005,ord_505,999.00,USD,failed,
+pay_9006,ord_506,42.10,gbp,settled,2026-01-15T12:20:00
